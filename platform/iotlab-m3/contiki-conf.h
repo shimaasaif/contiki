@@ -50,8 +50,10 @@
 #warning This warning can be ignored if you are working on a standalone iotlab-m3 board.
 #endif
 
-/* Openlab common definitions */
+// for iotlab-m3 use addr size 2
+#define RIMEADDR_CONF_SIZE 2
 
+/* Openlab common definitions */
 #include "../openlab/contiki-openlab-conf.h"
 
 #endif /* CONTIKI_CONF_H_ */

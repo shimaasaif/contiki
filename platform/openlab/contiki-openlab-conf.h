@@ -79,7 +79,9 @@ typedef int32_t  s32_t;
  * Global Configuration networking
  */
 typedef unsigned int uip_stats_t;
+#ifndef RIMEADDR_CONF_SIZE
 #define RIMEADDR_CONF_SIZE          8
+#endif /* RIMEADDR_CONF_SIZE */
 
 #define NETSTACK_CONF_RADIO         rf2xx_driver
 /* Max payload of rf2xx is 125 bytes (128 -1 for length -2 for CRC) */
@@ -189,7 +191,7 @@ typedef unsigned int uip_stats_t;
 #define UIP_CONF_IPV6_RPL           1
 
 // TODO replace by default contiki compression RFC6282 HC-06
-#define SICSLOWPAN_CONF_COMPRESSION SICSLOWPAN_COMPRESSION_IPV6
+#define SICSLOWPAN_CONF_COMPRESSION SICSLOWPAN_COMPRESSION_HC06
 #endif /* WITH_UIP6 */
 
 

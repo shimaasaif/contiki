@@ -29,7 +29,6 @@
 #include <string.h>
 
 #include "platform.h"
-#include "drivers/unique_id.h"
 #define NO_DEBUG_HEADER
 #define LOG_LEVEL LOG_LEVEL_INFO
 #include "debug.h"
@@ -46,6 +45,7 @@
 
 // fake button sensor
 #include "dev/button-sensor.h"
+#include "iotlab_uid.h"
 
 #include "contiki-net.h"
 
@@ -62,9 +62,9 @@ void xputc(char c);
 
 #define PROCESS_CONF_NO_PROCESS_NAMES 0
 
-#if RIMEADDR_SIZE != 8
-#error "RIME address size should be set to 8"
-#endif /*RIMEADDR_SIZE == 8*/
+#if RIMEADDR_SIZE != 2
+#error "RIME address size should be set to 2"
+#endif /*RIMEADDR_SIZE == 2*/
 
 /*-----------------------------------------------------------------------------------*/
 /*
@@ -87,46 +87,55 @@ void uip_log(char *msg)
     log_printf("%s\n", msg);
 }
 /*---------------------------------------------------------------------------*/
-void set_rime_addr()
+static void set_node_addresses()
 {
-    /* Company 3 Bytes */
-    rimeaddr_node_addr.u8[0] = 0x01;
-    rimeaddr_node_addr.u8[1] = 0x23;
-    rimeaddr_node_addr.u8[2] = 0x45;
+    uint16_t uid_16b;
 
-    /* Platform identifier */
-    rimeaddr_node_addr.u8[3] = 0x02;
+    // Use iotlab_uid
+    uid_16b = iotlab_uid();
 
-    /* Generate 4 remaining bytes using uid of processor */
-    int i;
-    for (i = 0; i < 4; i++)
-    {
-        // use bytes 8-11 to ensure uniqueness (tested empirically)
-        rimeaddr_node_addr.u8[i+4] = uid->uid8[i+8];
-    }
+    // Rime address
+    rimeaddr_node_addr.u8[0] = 0xff & (uid_16b >> 8);
+    rimeaddr_node_addr.u8[1] = 0xff & (uid_16b);
 
-    log_debug("Uid: %02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
-            uid->uid8[0],
-            uid->uid8[1],
-            uid->uid8[2],
-            uid->uid8[3],
-            uid->uid8[4],
-            uid->uid8[5],
-            uid->uid8[6],
-            uid->uid8[7],
-            uid->uid8[8],
-            uid->uid8[9],
-            uid->uid8[10],
-            uid->uid8[11]);
-    log_debug("Rime Addr: %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
+    /*
+     * Address for maximum compression
+     *
+     * http://tools.ietf.org/html/rfc6282#page-6
+     *
+     * 10: 16 bits.  The first 112 bits of the address are elided.
+     *     The value of the first 64 bits is the link-local prefix
+     *     padded with zeros.  The following 64 bits are
+     *     0000:00ff:fe00:XXXX, where XXXX are the 16 bits carried in-line.
+     *
+     * -------------------------------------------
+     *
+     * For 802.15.4, addresses are deducted from the uip_lladdr using the
+     * following code:
+     *     memcpy(ipaddr->u8 + 8, lladdr, UIP_LLADDR_LEN);
+     *     ipaddr->u8[8] ^= 0x02;
+     */
+    uip_lladdr.addr[0] = 0x02;  // should be a 0 after calculating ip addr
+    uip_lladdr.addr[1] = 0;
+    uip_lladdr.addr[2] = 0;
+    uip_lladdr.addr[3] = 0xff;
+    uip_lladdr.addr[4] = 0xfe;
+    uip_lladdr.addr[5] = 0;
+    uip_lladdr.addr[6] = rimeaddr_node_addr.u8[0];
+    uip_lladdr.addr[7] = rimeaddr_node_addr.u8[1];
+
+    log_debug("Rime Addr: %02x:%02x",
             rimeaddr_node_addr.u8[0],
-            rimeaddr_node_addr.u8[1],
-            rimeaddr_node_addr.u8[2],
-            rimeaddr_node_addr.u8[3],
-            rimeaddr_node_addr.u8[4],
-            rimeaddr_node_addr.u8[5],
-            rimeaddr_node_addr.u8[6],
-            rimeaddr_node_addr.u8[7]);
+            rimeaddr_node_addr.u8[1]);
+    log_debug("uip_lladdr: %02x%02x:%02x%02x:%02x%02x:%02x%02x",
+            uip_lladdr.addr[0],
+            uip_lladdr.addr[1],
+            uip_lladdr.addr[2],
+            uip_lladdr.addr[3],
+            uip_lladdr.addr[4],
+            uip_lladdr.addr[5],
+            uip_lladdr.addr[6],
+            uip_lladdr.addr[7]);
 }
 /*---------------------------------------------------------------------------*/
 static void
@@ -185,10 +194,9 @@ int main()
      */
 
     netstack_init();
-    set_rime_addr();
+    set_node_addresses();
 
 #if UIP_CONF_IPV6
-    memcpy(&uip_lladdr.addr, &rimeaddr_node_addr, sizeof(uip_lladdr.addr));
     process_start(&tcpip_process, NULL);
 
     #if VIZTOOL_CONF_ON
@@ -199,7 +207,7 @@ int main()
     {
 	uip_ipaddr_t ipaddr;
 
-	uip_ip6addr(&ipaddr, 0x2001, 0x630, 0x301, 0x6453, 0, 0, 0, 0);
+	uip_ip6addr(&ipaddr, 0xaaaa, 0, 0, 0, 0, 0, 0, 0);
 	uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
 	uip_ds6_addr_add(&ipaddr, 0, ADDR_TENTATIVE);
     }

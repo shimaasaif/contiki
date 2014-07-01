@@ -44,6 +44,9 @@
 #define SLIP_ARCH_CONF_BAUDRATE 500000
 #endif
 
+// for iotlab-a8-m3 use addr size 2
+#define RIMEADDR_CONF_SIZE 2
+
 /* Openlab common definitions */
 
 #include "../openlab/contiki-openlab-conf.h"
